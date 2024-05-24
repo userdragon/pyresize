@@ -1,0 +1,118 @@
+name: Build and Release
+
+on:
+  push
+
+permissions:
+  contents: write 
+
+jobs:
+  build:
+    if: startsWith(github.ref, 'refs/tags/') 
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        architecture: [amd64, 386]
+        exclude:
+          - os: ubuntu-latest
+            architecture: 386
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Setup Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.7
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Build with PyInstaller (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        pyinstaller --onefile --windowed src/main.py --icon=icon.ico --name=pyresize
+      env:
+        PYTHON_ARCH: ${{ matrix.architecture }}
+
+    - name: Build with PyInstaller (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        pyinstaller --onefile src/main.py --name=pyresize
+      env:
+        PYTHON_ARCH: ${{ matrix.architecture }}
+
+    - name: Archive build artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: build-${{ matrix.os }}-${{ matrix.architecture }}
+        path: dist/
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/') 
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download build artifacts (Windows 32bit)
+      uses: actions/download-artifact@v2
+      with:
+        name: build-windows-latest-386
+        path: build/windows/386
+
+    - name: Download build artifacts (Windows 64bit)
+      uses: actions/download-artifact@v2
+      with:
+        name: build-windows-latest-amd64
+        path: build/windows/amd64
+
+    - name: Download build artifacts (Linux 64bit)
+      uses: actions/download-artifact@v2
+      with:
+        name: build-ubuntu-latest-amd64
+        path: build/linux/amd64
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset (Windows 32bit)
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: build/windows/386/pyresize.exe
+        asset_name: pyresize-windows-386.exe
+        asset_content_type: application/octet-stream
+
+    - name: Upload Release Asset (Windows 64bit)
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: build/windows/amd64/pyresize.exe
+        asset_name: pyresize-windows-amd64.exe
+        asset_content_type: application/octet-stream
+
+    - name: Upload Release Asset (Linux 64bit)
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: build/linux/amd64/pyresize
+        asset_name: pyresize-linux-amd64
+        asset_content_type: application/octet-stream
