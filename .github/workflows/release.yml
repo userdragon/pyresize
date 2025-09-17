@@ -20,23 +20,27 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        # 安装包含tkdnd的完整包
         pip install Pillow==10.1.0
-        pip install tkdnd==0.2.0  # 这个包包含预编译的tkdnd库
+        pip install tkinterdnd2==0.3.0
         pip install pyinstaller
+
+    - name: Manually install tkdnd
+      run: |
+        # 直接下载并解压到Python的tcl目录
+        $url = "https://downloads.sourceforge.net/project/tkdnd/tkdnd/2.9.2/tkdnd-2.9.2-windows-x86_64.zip"
+        $output = "tkdnd.zip"
+        (New-Object System.Net.WebClient).DownloadFile($url, $output)
+        Expand-Archive -Path $output -DestinationPath "tkdnd_temp" -Force
+        Copy-Item -Path "tkdnd_temp\tkdnd2.9.2" -Destination "C:\hostedtoolcache\windows\Python\3.8.10\x64\tcl\" -Recurse -Force
 
     - name: Build with PyInstaller
       run: |
-        # 获取tkdnd库的安装路径
-        python -c "import tkdnd; print('tkdnd installed at:', tkdnd.__path__[0])" > tkdnd_path.txt
-        set /p TKDND_PATH=<tkdnd_path.txt
-        
-        # 打包应用程序，包含tkdnd库
         pyinstaller --onefile --windowed src/main.py --icon=icon.ico --name=pyresize `
           --hidden-import=tkinterdnd2 `
-          --add-data "%TKDND_PATH%\lib;tkdnd"
+          --add-data "C:\hostedtoolcache\windows\Python\3.8.10\x64\tcl\tkdnd2.9.2;tkdnd2.9.2"
 
     - name: Upload release asset
       uses: softprops/action-gh-release@v2
       with:
         files: dist/pyresize.exe
+    
