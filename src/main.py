@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 from PIL import Image
 import os
+import sys
 
 class DropTarget(tk.Frame):
     def __init__(self, parent, *args, **kwargs):
@@ -13,11 +14,6 @@ class DropTarget(tk.Frame):
         self.config(bg="#f0f0f0", relief=tk.SUNKEN, bd=2)
         self.grid_propagate(False)
         
-        # 允许拖放设置
-        self.configure(takefocus=True)
-        self.bind("<Enter>", lambda e: self.focus_set())
-        self.parent.bind("<ButtonPress-1>", lambda e: self.focus_set())
-        
         # 添加提示文本
         self.label = tk.Label(self, text="拖放图片到此处\n或点击下方浏览按钮", 
                              bg="#f0f0f0", justify=tk.CENTER)
@@ -27,43 +23,125 @@ class DropTarget(tk.Frame):
         self.file_list = scrolledtext.ScrolledText(self, height=6, width=40)
         self.file_list.pack(padx=5, pady=5, fill=tk.BOTH, expand=True)
         
-        # 绑定拖拽事件（跨平台兼容格式）
-        self.bind("<<DragEnter>>", self.on_drag_enter)
-        self.bind("<<DragLeave>>", self.on_drag_leave)
-        self.bind("<<Drop>>", self.on_drop)
-        self.bind("<<Motion>>", self.on_motion)
+        # 关键：配置拖放支持
+        self._configure_drag_and_drop()
         
         self.file_list.config(state=tk.DISABLED)
 
-    def on_drag_enter(self, event):
-        try:
-            # 检查是否有拖入数据
-            event.data
-            self.config(bg="#e0f0e0")
-            return event.action
-        except:
-            return
+    def _configure_drag_and_drop(self):
+        # 平台兼容的拖放配置
+        self.bind("<Enter>", self._on_enter)
+        self.bind("<Leave>", self._on_leave)
+        self.bind("<ButtonPress-1>", self._on_click)
+        
+        # 注册拖放目标
+        if sys.platform.startswith('win'):
+            # Windows平台
+            self.bind("<<Drop>>", self.on_drop)
+            self.bind("<WM_DROPFILES>", self._win_drop_files)
+            self._register_drop_target()
+        else:
+            # 类Unix平台 (Linux/macOS)
+            self.bind("<<DragEnter>>", self._on_drag_enter)
+            self.bind("<<DragLeave>>", self._on_drag_leave)
+            self.bind("<<Drop>>", self.on_drop)
+            self.bind("<B1-Motion>", self._on_drag_motion)
 
-    def on_drag_leave(self, event):
+    def _register_drop_target(self):
+        # Windows平台需要额外注册拖放目标
+        try:
+            import ctypes
+            from ctypes import wintypes
+            
+            # 注册窗口接受文件拖放
+            ctypes.windll.shell32.DragAcceptFiles(
+                self.winfo_id(), 
+                True  # 允许拖放
+            )
+        except:
+            pass  # 忽略注册失败的情况
+
+    def _win_drop_files(self, event):
+        # 处理Windows平台的文件拖放
+        import ctypes
+        from ctypes import wintypes
+        
+        num_files = ctypes.windll.shell32.DragQueryFileW(
+            event.data, 
+            -1, 
+            None, 
+            0
+        )
+        
+        files = []
+        for i in range(num_files):
+            # 获取文件名长度
+            buf_size = ctypes.windll.shell32.DragQueryFileW(
+                event.data, 
+                i, 
+                None, 
+                0
+            ) + 1  # +1 用于null终止符
+            
+            # 获取文件名
+            buffer = ctypes.create_unicode_buffer(buf_size)
+            ctypes.windll.shell32.DragQueryFileW(
+                event.data, 
+                i, 
+                buffer, 
+                buf_size
+            )
+            files.append(buffer.value)
+        
+        # 释放拖放数据
+        ctypes.windll.shell32.DragFinish(event.data)
+        
+        # 处理文件
+        self._process_dropped_files(files)
+
+    def _on_drag_enter(self, event):
+        self.config(bg="#e0f0e0")
+        return "break"
+
+    def _on_drag_leave(self, event):
         self.config(bg="#f0f0f0")
 
-    def on_motion(self, event):
-        return event.action
+    def _on_enter(self, event):
+        self.focus_set()
+        return "break"
+
+    def _on_leave(self, event):
+        self.config(bg="#f0f0f0")
+
+    def _on_click(self, event):
+        self.focus_set()
+
+    def _on_drag_motion(self, event):
+        return "break"
 
     def on_drop(self, event):
         self.config(bg="#f0f0f0")
-        # 解析拖入的文件路径
-        data = event.data.strip('{}')
-        files = [f.strip() for f in data.split('} {')]
         
+        # 处理类Unix平台的拖放
+        if not sys.platform.startswith('win'):
+            try:
+                # 解析拖入的文件路径
+                data = event.data.strip('{}')
+                files = [f.strip() for f in data.split('} {')]
+                self._process_dropped_files(files)
+            except Exception as e:
+                print(f"拖放错误: {e}")
+        
+        return "break"
+
+    def _process_dropped_files(self, files):
         # 过滤非图片文件
         image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff')
-        valid_files = [f for f in files if f.lower().endswith(image_extensions)]
+        valid_files = [f for f in files if os.path.isfile(f) and f.lower().endswith(image_extensions)]
         
         if valid_files:
             self.files = valid_files
             self.update_file_list()
-        return event.action
 
     def update_file_list(self):
         self.file_list.config(state=tk.NORMAL)
