@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 from PIL import Image
 import os
-import sys
 
 class DropTarget(tk.Frame):
     def __init__(self, parent, *args, **kwargs):
@@ -14,36 +13,41 @@ class DropTarget(tk.Frame):
         self.config(bg="#f0f0f0", relief=tk.SUNKEN, bd=2)
         self.grid_propagate(False)
         
+        # 允许拖放设置
+        self.configure(takefocus=True)
+        self.bind("<Enter>", lambda e: self.focus_set())
+        self.parent.bind("<ButtonPress-1>", lambda e: self.focus_set())
+        
         # 添加提示文本
         self.label = tk.Label(self, text="拖放图片到此处\n或点击下方浏览按钮", 
                              bg="#f0f0f0", justify=tk.CENTER)
         self.label.pack(pady=10)
         
         # 添加文件列表显示区域
-        self.file_list = scrolledtext.ScrolledText(self, height=6, width=50)
+        self.file_list = scrolledtext.ScrolledText(self, height=6, width=40)
         self.file_list.pack(padx=5, pady=5, fill=tk.BOTH, expand=True)
         
-        # 绑定拖拽事件
-        self.bind("<DragEnter>", self.on_drag_enter)
-        self.bind("<DragLeave>", self.on_drag_leave)
-        self.bind("<Drop>", self.on_drop)
-        self.bind("<Motion>", self.on_motion)
+        # 绑定拖拽事件（跨平台兼容格式）
+        self.bind("<<DragEnter>>", self.on_drag_enter)
+        self.bind("<<DragLeave>>", self.on_drag_leave)
+        self.bind("<<Drop>>", self.on_drop)
+        self.bind("<<Motion>>", self.on_motion)
         
-        # 允许接受拖拽
-        self.config(relief=tk.SUNKEN, bd=2)
         self.file_list.config(state=tk.DISABLED)
 
     def on_drag_enter(self, event):
-        # 检查拖入的是否是文件
-        if event.data.startswith('{'):
+        try:
+            # 检查是否有拖入数据
+            event.data
             self.config(bg="#e0f0e0")
             return event.action
+        except:
+            return
 
     def on_drag_leave(self, event):
         self.config(bg="#f0f0f0")
 
     def on_motion(self, event):
-        # 确保拖放操作有效
         return event.action
 
     def on_drop(self, event):
