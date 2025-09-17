@@ -87,7 +87,7 @@ def update_images():
 
 # 使用TkinterDnD创建主窗口以支持拖拽
 root = TkinterDnD.Tk()
-root.title("批量修改图片尺寸（统一96dpi）")
+root.title("三七改图（统一800*600-96dpi）")
 root.geometry("600x400")
 
 # 标签和输入框 - 默认宽度800
