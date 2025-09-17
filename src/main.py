@@ -23,23 +23,21 @@ class DropTarget(tk.Frame):
         self.file_list = scrolledtext.ScrolledText(self, height=6, width=40)
         self.file_list.pack(padx=5, pady=5, fill=tk.BOTH, expand=True)
         
-        # 关键：配置拖放支持
+        # 配置拖放支持
         self._configure_drag_and_drop()
         
         self.file_list.config(state=tk.DISABLED)
 
     def _configure_drag_and_drop(self):
-        # 平台兼容的拖放配置
+        # 基础事件绑定
         self.bind("<Enter>", self._on_enter)
         self.bind("<Leave>", self._on_leave)
         self.bind("<ButtonPress-1>", self._on_click)
         
-        # 注册拖放目标
+        # 跨平台拖放配置
         if sys.platform.startswith('win'):
-            # Windows平台
-            self.bind("<<Drop>>", self.on_drop)
-            self.bind("<WM_DROPFILES>", self._win_drop_files)
-            self._register_drop_target()
+            # Windows平台 - 使用更兼容的方式
+            self._setup_windows_drag_drop()
         else:
             # 类Unix平台 (Linux/macOS)
             self.bind("<<DragEnter>>", self._on_drag_enter)
@@ -47,57 +45,73 @@ class DropTarget(tk.Frame):
             self.bind("<<Drop>>", self.on_drop)
             self.bind("<B1-Motion>", self._on_drag_motion)
 
-    def _register_drop_target(self):
-        # Windows平台需要额外注册拖放目标
+    def _setup_windows_drag_drop(self):
+        # Windows平台拖放设置（避免使用WM_DROPFILES事件）
         try:
-            import ctypes
-            from ctypes import wintypes
-            
-            # 注册窗口接受文件拖放
-            ctypes.windll.shell32.DragAcceptFiles(
-                self.winfo_id(), 
-                True  # 允许拖放
-            )
+            # 尝试注册拖放目标
+            self._register_win32_drag_drop()
         except:
-            pass  # 忽略注册失败的情况
+            # 注册失败时使用备选方案
+            self.bind("<<Drop>>", self._windows_drop_fallback)
+        
+        # 添加视觉反馈
+        self.bind("<Motion>", self._on_motion)
 
-    def _win_drop_files(self, event):
-        # 处理Windows平台的文件拖放
+    def _register_win32_drag_drop(self):
+        # 使用ctypes注册拖放目标，但不绑定WM_DROPFILES事件
         import ctypes
         from ctypes import wintypes
         
-        num_files = ctypes.windll.shell32.DragQueryFileW(
-            event.data, 
-            -1, 
-            None, 
-            0
-        )
+        # 注册窗口接受文件拖放
+        hwnd = self.winfo_id()
+        ctypes.windll.shell32.DragAcceptFiles(hwnd, True)
         
+        # 创建一个回调函数处理拖放消息
+        def wndproc(hwnd, msg, wparam, lparam):
+            if msg == 0x0233:  # WM_DROPFILES的数值常量
+                self._process_win32_drop_files(wparam)
+                return 0
+            return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+        
+        # 设置窗口过程回调
+        self.original_wndproc = ctypes.windll.user32.SetWindowLongW(
+            hwnd, 
+            -4,  # GWL_WNDPROC
+            ctypes.CFUNCTYPE(wintypes.LONG, wintypes.HWND, wintypes.UINT, 
+                           wintypes.WPARAM, wintypes.LPARAM)(wndproc)
+        )
+
+    def _process_win32_drop_files(self, hdrop):
+        # 处理Windows平台的拖放文件
+        import ctypes
+        from ctypes import wintypes
+        
+        num_files = ctypes.windll.shell32.DragQueryFileW(hdrop, -1, None, 0)
         files = []
+        
         for i in range(num_files):
             # 获取文件名长度
-            buf_size = ctypes.windll.shell32.DragQueryFileW(
-                event.data, 
-                i, 
-                None, 
-                0
-            ) + 1  # +1 用于null终止符
+            buf_size = ctypes.windll.shell32.DragQueryFileW(hdrop, i, None, 0) + 1
+            buffer = ctypes.create_unicode_buffer(buf_size)
             
             # 获取文件名
-            buffer = ctypes.create_unicode_buffer(buf_size)
-            ctypes.windll.shell32.DragQueryFileW(
-                event.data, 
-                i, 
-                buffer, 
-                buf_size
-            )
+            ctypes.windll.shell32.DragQueryFileW(hdrop, i, buffer, buf_size)
             files.append(buffer.value)
         
         # 释放拖放数据
-        ctypes.windll.shell32.DragFinish(event.data)
+        ctypes.windll.shell32.DragFinish(hdrop)
         
         # 处理文件
         self._process_dropped_files(files)
+
+    def _windows_drop_fallback(self, event):
+        # Windows平台拖放备选处理方案
+        try:
+            data = event.data.strip('{}')
+            files = [f.strip() for f in data.split('} {') if f.strip()]
+            self._process_dropped_files(files)
+        except Exception as e:
+            print(f"拖放处理错误: {e}")
 
     def _on_drag_enter(self, event):
         self.config(bg="#e0f0e0")
@@ -119,18 +133,19 @@ class DropTarget(tk.Frame):
     def _on_drag_motion(self, event):
         return "break"
 
+    def _on_motion(self, event):
+        return "break"
+
     def on_drop(self, event):
         self.config(bg="#f0f0f0")
         
         # 处理类Unix平台的拖放
-        if not sys.platform.startswith('win'):
-            try:
-                # 解析拖入的文件路径
-                data = event.data.strip('{}')
-                files = [f.strip() for f in data.split('} {')]
-                self._process_dropped_files(files)
-            except Exception as e:
-                print(f"拖放错误: {e}")
+        try:
+            data = event.data.strip('{}')
+            files = [f.strip() for f in data.split('} {') if f.strip()]
+            self._process_dropped_files(files)
+        except Exception as e:
+            print(f"拖放错误: {e}")
         
         return "break"
 
@@ -243,3 +258,4 @@ root.grid_columnconfigure(1, weight=1)
 
 # 运行主循环
 root.mainloop()
+    
