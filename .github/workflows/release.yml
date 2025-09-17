@@ -7,28 +7,31 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest  # 或 ubuntu-latest/macos-latest
+    runs-on: windows-latest  # 只保留Windows构建
 
     steps:
     - uses: actions/checkout@v4
 
     - name: Setup Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v5  # 升级到最新版本
       with:
-        python-version: '3.8'  # 使用支持的Python版本
+        python-version: '3.8'  # 使用兼容Windows的Python版本
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt  # 安装requirements.txt中的所有依赖
+        pip install -r requirements.txt  # 安装项目依赖
         pip install pyinstaller  # 安装打包工具
+        pip install tkinterdnd2  # 确保安装拖拽功能依赖
 
-    - name: Build executable
+    - name: Build with PyInstaller (Windows)
       run: |
-        pyinstaller --onefile --name "ImageResizer" --hidden-import=tkinterdnd2 main.py
+        pyinstaller --onefile --windowed src/main.py --icon=icon.ico --name=pyresize --hidden-import=tkinterdnd2
+      env:
+        PYTHON_ARCH: x64  # 指定64位架构
 
     - name: Upload release asset
       uses: softprops/action-gh-release@v2
       with:
-        files: dist/ImageResizer.exe
+        files: dist/pyresize.exe  # 与构建命令中的name保持一致
     
