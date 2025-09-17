@@ -14,6 +14,9 @@ class DropTarget(tk.Frame):
         self.config(bg="#f0f0f0", relief=tk.SUNKEN, bd=2)
         self.grid_propagate(False)
         
+        # 先创建状态标签（关键修复：确保在任何拖放配置前创建）
+        self.status_label = tk.Label(self, text="就绪", bg="#f0f0f0", font=("Arial", 8))
+        
         # 添加提示文本
         self.label = tk.Label(self, text="拖放图片到此处\n或点击下方浏览按钮", 
                              bg="#f0f0f0", justify=tk.CENTER)
@@ -23,12 +26,11 @@ class DropTarget(tk.Frame):
         self.file_list = scrolledtext.ScrolledText(self, height=6, width=40)
         self.file_list.pack(padx=5, pady=5, fill=tk.BOTH, expand=True)
         
-        # 配置拖放支持
-        self._configure_drag_and_drop()
-        
-        # 调试用状态标签
-        self.status_label = tk.Label(self, text="就绪", bg="#f0f0f0", font=("Arial", 8))
+        # 显示状态标签
         self.status_label.pack(pady=5)
+        
+        # 配置拖放支持（现在status_label已创建）
+        self._configure_drag_and_drop()
         
         self.file_list.config(state=tk.DISABLED)
 
