@@ -61,7 +61,7 @@ height_entry.insert(0, "600")  # 修改默认高度为600
 tk.Label(root, text="DPI:").grid(row=2, column=0, padx=10, pady=5)
 dpi_entry = tk.Entry(root)
 dpi_entry.grid(row=2, column=1, padx=10, pady=5)
-dpi_entry.insert(0, "300")  # 初始默认值，选择文件后会自动更新
+dpi_entry.insert(0, "96")  # 初始默认值，选择文件后会自动更新
 
 # 文件选择框
 tk.Label(root, text="选择文件:").grid(row=3, column=0, padx=10, pady=5)
