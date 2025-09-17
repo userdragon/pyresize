@@ -26,17 +26,20 @@ class DropTarget(tk.Frame):
         # 配置拖放支持
         self._configure_drag_and_drop()
         
+        # 调试用状态标签
+        self.status_label = tk.Label(self, text="就绪", bg="#f0f0f0", font=("Arial", 8))
+        self.status_label.pack(pady=5)
+        
         self.file_list.config(state=tk.DISABLED)
 
     def _configure_drag_and_drop(self):
-        # 基础事件绑定
+        # 基础事件绑定 - 用于跟踪拖放状态
         self.bind("<Enter>", self._on_enter)
         self.bind("<Leave>", self._on_leave)
         self.bind("<ButtonPress-1>", self._on_click)
         
         # 跨平台拖放配置
         if sys.platform.startswith('win'):
-            # Windows平台 - 使用更兼容的方式
             self._setup_windows_drag_drop()
         else:
             # 类Unix平台 (Linux/macOS)
@@ -44,88 +47,99 @@ class DropTarget(tk.Frame):
             self.bind("<<DragLeave>>", self._on_drag_leave)
             self.bind("<<Drop>>", self.on_drop)
             self.bind("<B1-Motion>", self._on_drag_motion)
+        
+        # 允许接受数据
+        self.focus_set()
+        self.configure(takefocus=True)
 
     def _setup_windows_drag_drop(self):
-        # Windows平台拖放设置（避免使用WM_DROPFILES事件）
+        # Windows平台拖放设置
         try:
-            # 尝试注册拖放目标
-            self._register_win32_drag_drop()
-        except:
-            # 注册失败时使用备选方案
+            import ctypes
+            from ctypes import wintypes
+            
+            # 注册窗口接受文件拖放
+            hwnd = self.winfo_id()
+            ctypes.windll.shell32.DragAcceptFiles(hwnd, True)
+            
+            # 定义窗口过程回调函数
+            def wndproc(hwnd, msg, wparam, lparam):
+                if msg == 0x0233:  # WM_DROPFILES
+                    self.status_label.config(text="检测到拖放文件")
+                    self._process_win32_drop_files(wparam)
+                    return 0
+                return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+            
+            # 设置窗口过程
+            self.original_wndproc = ctypes.windll.user32.SetWindowLongW(
+                hwnd, 
+                -4,  # GWL_WNDPROC
+                ctypes.CFUNCTYPE(wintypes.LONG, wintypes.HWND, wintypes.UINT, 
+                               wintypes.WPARAM, wintypes.LPARAM)(wndproc)
+            )
+            
+            self.status_label.config(text="Windows拖放已启用")
+        except Exception as e:
+            self.status_label.config(text=f"拖放初始化: {str(e)[:30]}")
+            # 备选方案 - 使用通用拖放处理
             self.bind("<<Drop>>", self._windows_drop_fallback)
-        
-        # 添加视觉反馈
-        self.bind("<Motion>", self._on_motion)
-
-    def _register_win32_drag_drop(self):
-        # 使用ctypes注册拖放目标，但不绑定WM_DROPFILES事件
-        import ctypes
-        from ctypes import wintypes
-        
-        # 注册窗口接受文件拖放
-        hwnd = self.winfo_id()
-        ctypes.windll.shell32.DragAcceptFiles(hwnd, True)
-        
-        # 创建一个回调函数处理拖放消息
-        def wndproc(hwnd, msg, wparam, lparam):
-            if msg == 0x0233:  # WM_DROPFILES的数值常量
-                self._process_win32_drop_files(wparam)
-                return 0
-            return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
-        
-        # 设置窗口过程回调
-        self.original_wndproc = ctypes.windll.user32.SetWindowLongW(
-            hwnd, 
-            -4,  # GWL_WNDPROC
-            ctypes.CFUNCTYPE(wintypes.LONG, wintypes.HWND, wintypes.UINT, 
-                           wintypes.WPARAM, wintypes.LPARAM)(wndproc)
-        )
 
     def _process_win32_drop_files(self, hdrop):
         # 处理Windows平台的拖放文件
-        import ctypes
-        from ctypes import wintypes
-        
-        num_files = ctypes.windll.shell32.DragQueryFileW(hdrop, -1, None, 0)
-        files = []
-        
-        for i in range(num_files):
-            # 获取文件名长度
-            buf_size = ctypes.windll.shell32.DragQueryFileW(hdrop, i, None, 0) + 1
-            buffer = ctypes.create_unicode_buffer(buf_size)
+        try:
+            import ctypes
+            from ctypes import wintypes
             
-            # 获取文件名
-            ctypes.windll.shell32.DragQueryFileW(hdrop, i, buffer, buf_size)
-            files.append(buffer.value)
-        
-        # 释放拖放数据
-        ctypes.windll.shell32.DragFinish(hdrop)
-        
-        # 处理文件
-        self._process_dropped_files(files)
+            num_files = ctypes.windll.shell32.DragQueryFileW(hdrop, -1, None, 0)
+            self.status_label.config(text=f"发现 {num_files} 个文件")
+            
+            files = []
+            for i in range(num_files):
+                # 获取文件名长度
+                buf_size = ctypes.windll.shell32.DragQueryFileW(hdrop, i, None, 0) + 1
+                buffer = ctypes.create_unicode_buffer(buf_size)
+                
+                # 获取文件名
+                ctypes.windll.shell32.DragQueryFileW(hdrop, i, buffer, buf_size)
+                files.append(buffer.value)
+            
+            # 释放拖放数据
+            ctypes.windll.shell32.DragFinish(hdrop)
+            
+            # 处理文件
+            self._process_dropped_files(files)
+        except Exception as e:
+            self.status_label.config(text=f"处理错误: {str(e)[:30]}")
 
     def _windows_drop_fallback(self, event):
         # Windows平台拖放备选处理方案
         try:
-            data = event.data.strip('{}')
-            files = [f.strip() for f in data.split('} {') if f.strip()]
-            self._process_dropped_files(files)
+            self.status_label.config(text="尝试处理拖放文件")
+            if hasattr(event, 'data') and event.data:
+                data = event.data.strip('{}')
+                files = [f.strip() for f in data.split('} {') if f.strip()]
+                self._process_dropped_files(files)
+            else:
+                self.status_label.config(text="未检测到文件数据")
         except Exception as e:
-            print(f"拖放处理错误: {e}")
+            self.status_label.config(text=f"备选处理错误: {str(e)[:30]}")
 
     def _on_drag_enter(self, event):
         self.config(bg="#e0f0e0")
+        self.status_label.config(text="拖入文件中...")
         return "break"
 
     def _on_drag_leave(self, event):
         self.config(bg="#f0f0f0")
+        self.status_label.config(text="文件已拖出")
 
     def _on_enter(self, event):
         self.focus_set()
         return "break"
 
     def _on_leave(self, event):
-        self.config(bg="#f0f0f0")
+        if not self.winfo_containing(event.x_root, event.y_root) == self:
+            self.config(bg="#f0f0f0")
 
     def _on_click(self, event):
         self.focus_set()
@@ -133,30 +147,42 @@ class DropTarget(tk.Frame):
     def _on_drag_motion(self, event):
         return "break"
 
-    def _on_motion(self, event):
-        return "break"
-
     def on_drop(self, event):
         self.config(bg="#f0f0f0")
         
         # 处理类Unix平台的拖放
         try:
-            data = event.data.strip('{}')
-            files = [f.strip() for f in data.split('} {') if f.strip()]
-            self._process_dropped_files(files)
+            self.status_label.config(text="处理拖放文件")
+            if hasattr(event, 'data') and event.data:
+                data = event.data.strip('{}')
+                files = [f.strip() for f in data.split('} {') if f.strip()]
+                self._process_dropped_files(files)
+            else:
+                self.status_label.config(text="未检测到文件数据")
         except Exception as e:
-            print(f"拖放错误: {e}")
+            self.status_label.config(text=f"拖放错误: {str(e)[:30]}")
         
         return "break"
 
     def _process_dropped_files(self, files):
         # 过滤非图片文件
-        image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff')
-        valid_files = [f for f in files if os.path.isfile(f) and f.lower().endswith(image_extensions)]
+        image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp')
+        valid_files = []
         
+        for file in files:
+            # 检查文件是否存在且是图片
+            if os.path.isfile(file):
+                ext = os.path.splitext(file)[1].lower()
+                if ext in image_extensions:
+                    valid_files.append(file)
+        
+        # 更新状态和文件列表
         if valid_files:
             self.files = valid_files
             self.update_file_list()
+            self.status_label.config(text=f"已加载 {len(valid_files)} 个图片文件")
+        else:
+            self.status_label.config(text="未找到有效的图片文件")
 
     def update_file_list(self):
         self.file_list.config(state=tk.NORMAL)
@@ -171,10 +197,11 @@ class DropTarget(tk.Frame):
     def set_files(self, files):
         self.files = files
         self.update_file_list()
+        self.status_label.config(text=f"已选择 {len(files)} 个文件")
 
 def select_files(drop_target):
     file_paths = filedialog.askopenfilenames(
-        filetypes=[("图片文件", "*.jpg *.jpeg *.png *.gif *.bmp *.tiff")]
+        filetypes=[("图片文件", "*.jpg *.jpeg *.png *.gif *.bmp *.tiff *.webp")]
     )
     if file_paths:
         drop_target.set_files(list(file_paths))
@@ -221,7 +248,7 @@ def update_exif(drop_target):
 # 创建主窗口
 root = tk.Tk()
 root.title("批量修改图片尺寸")
-root.geometry("600x400")
+root.geometry("600x450")  # 增加高度以容纳状态标签
 
 # 标签和输入框
 tk.Label(root, text="宽度:").grid(row=0, column=0, padx=10, pady=5, sticky=tk.E)
