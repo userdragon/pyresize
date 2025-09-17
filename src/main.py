@@ -106,9 +106,14 @@ root = TkinterDnD.Tk()
 root.title("批量修改图片尺寸（统一96dpi）")
 root.geometry("700x450")
 
-# 配置Tkinter以找到tkdnd库
+# 修正tkdnd库初始化方式 - 使用正确的参数格式
 tkdnd_path = resource_path('tkdnd2.9.2')
-root.eval(f'::tkdnd::initialise "{tkdnd_path}"')
+try:
+    # 正确的初始化参数格式：目录路径、库文件名、包名
+    root.eval(f'::tkdnd::initialise "{tkdnd_path}" "tkdnd292.dll" "tkdnd"')
+except:
+    # 初始化失败时的容错处理
+    messagebox.showwarning("提示", "拖拽功能初始化失败，仍可使用浏览按钮选择文件")
 
 # 宽度输入
 tk.Label(root, text="宽度:").grid(row=0, column=0, padx=10, pady=5, sticky="e")
