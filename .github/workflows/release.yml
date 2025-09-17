@@ -24,26 +24,17 @@ jobs:
         pip install tkinterdnd2==0.3.0
         pip install pyinstaller
 
-    - name: Download and install tkdnd library
+    - name: Copy tkdnd library from project
       run: |
-        # 使用备用下载链接（来自GitHub镜像）
-        $url = "https://github.com/paulbrodersen/tkdnd/releases/download/v2.9.2/tkdnd-2.9.2-windows-x86_64.zip"
-        $output = "tkdnd.zip"
-        
-        # 下载文件
-        $webClient = New-Object System.Net.WebClient
-        $webClient.DownloadFile($url, $output)
-        
-        # 解压并安装
-        Expand-Archive -Path $output -DestinationPath "tkdnd_temp" -Force
+        # 仅从项目本地复制，不执行任何下载操作
         New-Item -Path "C:\hostedtoolcache\windows\Python\3.8.10\x64\tcl\tkdnd2.9.2" -ItemType Directory -Force
-        Copy-Item -Path "tkdnd_temp\tkdnd2.9.2\*" -Destination "C:\hostedtoolcache\windows\Python\3.8.10\x64\tcl\tkdnd2.9.2" -Recurse -Force
+        Copy-Item -Path "tkdnd\tkdnd2.9.2\*" -Destination "C:\hostedtoolcache\windows\Python\3.8.10\x64\tcl\tkdnd2.9.2" -Recurse -Force
 
     - name: Build with PyInstaller
       run: |
         pyinstaller --onefile --windowed src/main.py --icon=icon.ico --name=pyresize `
           --hidden-import=tkinterdnd2 `
-          --add-data "C:\hostedtoolcache\windows\Python\3.8.10\x64\tcl\tkdnd2.9.2;tkdnd2.9.2"
+          --add-data "tkdnd\tkdnd2.9.2;tkdnd2.9.2"
 
     - name: Upload release asset
       uses: softprops/action-gh-release@v2
