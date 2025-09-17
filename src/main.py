@@ -10,13 +10,13 @@ def select_file():
         # 尝试读取并设置原图片的DPI
         try:
             with Image.open(file_path) as img:
-                dpi = img.info.get('dpi', (300, 300))  # 默认300如果没有DPI信息
+                dpi = img.info.get('dpi', (96, 96))  # 默认300如果没有DPI信息
                 dpi_entry.delete(0, tk.END)
                 dpi_entry.insert(0, str(int(dpi[0])))  # 取水平DPI
         except Exception as e:
             messagebox.showwarning("警告", f"无法读取图片DPI信息，使用默认值: {e}")
             dpi_entry.delete(0, tk.END)
-            dpi_entry.insert(0, "300")
+            dpi_entry.insert(0, "96")
 
 def update_exif():
     file_path = file_entry.get()
