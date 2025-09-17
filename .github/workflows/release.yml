@@ -12,15 +12,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest]  # 只保留Windows系统
-        architecture: [amd64, 386]  # 保留32位和64位Windows
+        os: [windows-latest]  # 只保留Windows编译
+        architecture: [amd64, 386]
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4  # 同步升级checkout版本
 
     - name: Setup Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5  # 升级Python setup版本
       with:
         python-version: 3.7
 
@@ -31,13 +31,14 @@ jobs:
         pip install pyinstaller
 
     - name: Build with PyInstaller (Windows)
+      if: matrix.os == 'windows-latest'
       run: |
         pyinstaller --onefile --windowed src/main.py --icon=icon.ico --name=pyresize
       env:
         PYTHON_ARCH: ${{ matrix.architecture }}
 
     - name: Archive build artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4  # 升级到v4版本
       with:
         name: build-${{ matrix.os }}-${{ matrix.architecture }}
         path: dist/
@@ -48,13 +49,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Download build artifacts (Windows 32bit)
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v4  # 升级到v4版本
       with:
         name: build-windows-latest-386
         path: build/windows/386
 
     - name: Download build artifacts (Windows 64bit)
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v4  # 升级到v4版本
       with:
         name: build-windows-latest-amd64
         path: build/windows/amd64
