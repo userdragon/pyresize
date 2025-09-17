@@ -12,11 +12,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest]
-        architecture: [amd64, 386]
-        exclude:
-          - os: ubuntu-latest
-            architecture: 386
+        os: [windows-latest]  # 只保留Windows系统
+        architecture: [amd64, 386]  # 保留32位和64位Windows
 
     steps:
     - name: Checkout code
@@ -34,16 +31,8 @@ jobs:
         pip install pyinstaller
 
     - name: Build with PyInstaller (Windows)
-      if: matrix.os == 'windows-latest'
       run: |
         pyinstaller --onefile --windowed src/main.py --icon=icon.ico --name=pyresize
-      env:
-        PYTHON_ARCH: ${{ matrix.architecture }}
-
-    - name: Build with PyInstaller (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        pyinstaller --onefile src/main.py --name=pyresize
       env:
         PYTHON_ARCH: ${{ matrix.architecture }}
 
@@ -69,12 +58,6 @@ jobs:
       with:
         name: build-windows-latest-amd64
         path: build/windows/amd64
-
-    - name: Download build artifacts (Linux 64bit)
-      uses: actions/download-artifact@v2
-      with:
-        name: build-ubuntu-latest-amd64
-        path: build/linux/amd64
 
     - name: Create Release
       id: create_release
@@ -105,14 +88,4 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: build/windows/amd64/pyresize.exe
         asset_name: pyresize-windows-amd64.exe
-        asset_content_type: application/octet-stream
-
-    - name: Upload Release Asset (Linux 64bit)
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: build/linux/amd64/pyresize
-        asset_name: pyresize-linux-amd64
         asset_content_type: application/octet-stream
