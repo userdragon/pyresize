@@ -101,19 +101,32 @@ def update_images():
     
     messagebox.showinfo("处理结果", result_msg)
 
+def test_drag_and_drop():
+    """测试拖拽功能是否真正可用"""
+    try:
+        # 尝试执行一个简单的拖拽相关操作来验证功能
+        root.call('::tkdnd::version')
+        return True
+    except:
+        return False
+
 # 初始化主窗口
 root = TkinterDnD.Tk()
 root.title("批量修改图片尺寸（统一96dpi）")
 root.geometry("700x450")
 
-# 修正tkdnd库初始化方式 - 使用正确的参数格式
+# 优化tkdnd库初始化检测
 tkdnd_path = resource_path('tkdnd2.9.2')
 try:
-    # 正确的初始化参数格式：目录路径、库文件名、包名
+    # 尝试初始化tkdnd库
     root.eval(f'::tkdnd::initialise "{tkdnd_path}" "tkdnd292.dll" "tkdnd"')
+    
+    # 实际测试拖拽功能是否可用
+    if not test_drag_and_drop():
+        raise Exception("拖拽功能测试失败")
 except:
-    # 初始化失败时的容错处理
-    messagebox.showwarning("提示", "拖拽功能初始化失败，仍可使用浏览按钮选择文件")
+    # 只有在确实无法使用时才显示提示
+    messagebox.showwarning("提示", "拖拽功能可能无法使用，建议使用浏览按钮选择文件")
 
 # 宽度输入
 tk.Label(root, text="宽度:").grid(row=0, column=0, padx=10, pady=5, sticky="e")
