@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, Listbox, Scrollbar, END
 from PIL import Image
-import os
 
 def select_files():
     file_paths = filedialog.askopenfilenames(
@@ -13,6 +12,15 @@ def select_files():
         # 添加新文件
         for path in file_paths:
             file_list.insert(END, path)
+        
+        # 尝试读取第一个文件的DPI作为参考
+        try:
+            with Image.open(file_paths[0]) as img:
+                dpi = img.info.get('dpi', (96, 96))
+                dpi_entry.delete(0, tk.END)
+                dpi_entry.insert(0, str(int(dpi[0])))
+        except Exception as e:
+            messagebox.showwarning("警告", f"无法读取图片DPI信息，使用默认值: {e}")
 
 def update_exif():
     # 获取所有选中的文件
@@ -55,23 +63,25 @@ def update_exif():
 # 创建主窗口
 root = tk.Tk()
 root.title("批量修改图片尺寸")
-root.geometry("600x400")  # 增大窗口尺寸以适应列表
+root.geometry("600x400")
 
-# 标签和输入框
+# 标签和输入框 - 默认宽度800
 tk.Label(root, text="宽度:").grid(row=0, column=0, padx=10, pady=5, sticky="e")
 width_entry = tk.Entry(root)
 width_entry.grid(row=0, column=1, padx=10, pady=5, sticky="we")
-width_entry.insert(0, "588")
+width_entry.insert(0, "800")  # 默认宽度800
 
+# 标签和输入框 - 默认高度600
 tk.Label(root, text="高度:").grid(row=1, column=0, padx=10, pady=5, sticky="e")
 height_entry = tk.Entry(root)
 height_entry.grid(row=1, column=1, padx=10, pady=5, sticky="we")
-height_entry.insert(0, "354")
+height_entry.insert(0, "600")  # 默认高度600
 
+# 标签和输入框 - DPI自动识别
 tk.Label(root, text="DPI:").grid(row=2, column=0, padx=10, pady=5, sticky="e")
 dpi_entry = tk.Entry(root)
 dpi_entry.grid(row=2, column=1, padx=10, pady=5, sticky="we")
-dpi_entry.insert(0, "300")
+dpi_entry.insert(0, "96")  # 初始默认值
 
 # 文件选择区域
 tk.Label(root, text="选中的文件:").grid(row=3, column=0, padx=10, pady=5, sticky="ne")
@@ -92,11 +102,11 @@ scrollbar.config(command=file_list.yview)
 file_button = tk.Button(root, text="浏览", command=select_files)
 file_button.grid(row=3, column=2, padx=10, pady=5)
 
-# 更新EXIF数据按钮
+# 更新按钮
 update_button = tk.Button(root, text="批量更新图片", command=update_exif)
 update_button.grid(row=4, column=0, columnspan=3, pady=10)
 
-# 设置网格权重，使列表框可以拉伸
+# 设置网格权重
 root.grid_rowconfigure(3, weight=1)
 root.grid_columnconfigure(1, weight=1)
 
