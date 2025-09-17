@@ -1,17 +1,65 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, Listbox, Scrollbar, END
 from PIL import Image
+import os
 
 def select_files():
     file_paths = filedialog.askopenfilenames(
         filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp *.gif")]
     )
     if file_paths:
-        # 清空现有列表
-        file_list.delete(0, END)
-        # 添加新文件
-        for path in file_paths:
-            file_list.insert(END, path)
+        add_files_to_list(file_paths)
+
+def add_files_to_list(file_paths):
+    """将文件路径添加到列表框中"""
+    # 清空现有列表
+    file_list.delete(0, END)
+    # 添加新文件
+    for path in file_paths:
+        file_list.insert(END, path)
+
+def on_drag_enter(event):
+    """处理拖拽进入事件"""
+    event.widget.focus_set()
+    # 检查拖拽的数据是否包含文件
+    if event.data.startswith('{'):
+        event.accept()
+    else:
+        event.ignore()
+
+def on_drag_leave(event):
+    """处理拖拽离开事件"""
+    pass
+
+def on_drag_over(event):
+    """处理拖拽悬停事件"""
+    if event.data.startswith('{'):
+        event.accept()
+    else:
+        event.ignore()
+
+def on_drop(event):
+    """处理放置事件，获取拖拽的文件路径"""
+    # 解析拖拽的文件路径
+    data = event.data
+    # 处理Windows系统的文件路径格式
+    if data.startswith('{') and data.endswith('}'):
+        data = data[1:-1]
+    
+    # 分割多个文件路径
+    file_paths = data.split('} {')
+    
+    # 过滤非图片文件
+    image_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.gif')
+    valid_files = []
+    for path in file_paths:
+        if path.lower().endswith(image_extensions):
+            valid_files.append(path)
+    
+    if valid_files:
+        add_files_to_list(valid_files)
+    else:
+        messagebox.showwarning("警告", "请拖拽图片文件（支持jpg、jpeg、png、bmp、gif格式）")
 
 def update_images():
     # 获取所有选中的文件
@@ -57,6 +105,13 @@ def update_images():
 root = tk.Tk()
 root.title("批量修改图片尺寸（统一96dpi）")
 root.geometry("600x400")
+
+# 启用窗口接受拖拽
+root.drop_target_register('DND_Files')
+root.dnd_bind('<<DropEnter>>', on_drag_enter)
+root.dnd_bind('<<DropLeave>>', on_drag_leave)
+root.dnd_bind('<<DropOver>>', on_drag_over)
+root.dnd_bind('<<Drop>>', on_drop)
 
 # 标签和输入框 - 默认宽度800
 tk.Label(root, text="宽度:").grid(row=0, column=0, padx=10, pady=5, sticky="e")
