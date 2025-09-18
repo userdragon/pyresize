@@ -103,7 +103,7 @@ def update_images():
 
 # 初始化主窗口
 root = TkinterDnD.Tk()
-root.title("批量修改图片尺寸（统一96dpi）")
+root.title("三七改图（统一800*600-96dpi）")
 root.geometry("700x450")
 
 # 移除初始化时的严格检查，改为在实际拖拽失败时提示
