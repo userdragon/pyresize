@@ -23,44 +23,44 @@ def select_files():
 def add_files_to_list(file_paths):
     """将文件路径添加到列表框中"""
     for path in file_paths:
-        # 避免添加重复文件
         if path not in [file_list.get(i) for i in range(file_list.size())]:
             file_list.insert(END, path)
 
 def on_drop(event):
     """处理放置事件，获取拖拽的文件路径"""
-    data = event.data.strip()
-    
-    if '{' in data and '}' in data:
-        data = data.replace('{', '').replace('}', '')
-        file_paths = data.split()
-    else:
-        file_paths = data.split()
-    
-    image_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.gif')
-    valid_files = []
-    for path in file_paths:
-        if os.path.exists(path) and path.lower().endswith(image_extensions):
-            valid_files.append(path)
-    
-    if valid_files:
-        add_files_to_list(valid_files)
-    else:
-        messagebox.showwarning("警告", "请拖拽有效的图片文件（支持jpg、jpeg、png、bmp、gif格式）")
+    try:
+        data = event.data.strip()
+        
+        if '{' in data and '}' in data:
+            data = data.replace('{', '').replace('}', '')
+            file_paths = data.split()
+        else:
+            file_paths = data.split()
+        
+        image_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.gif')
+        valid_files = []
+        for path in file_paths:
+            if os.path.exists(path) and path.lower().endswith(image_extensions):
+                valid_files.append(path)
+        
+        if valid_files:
+            add_files_to_list(valid_files)
+        else:
+            messagebox.showwarning("警告", "请拖拽有效的图片文件（支持jpg、jpeg、png、bmp、gif格式）")
+    except Exception as e:
+        # 只在拖拽操作实际失败时显示提示
+        messagebox.showwarning("提示", "拖拽功能暂时不可用，请使用浏览按钮选择文件")
 
 def delete_selected():
-    """删除选中的文件"""
     selected_indices = file_list.curselection()
     if not selected_indices:
         messagebox.showinfo("提示", "请先选中要删除的文件")
         return
     
-    # 从后往前删除，避免索引变化导致错误
     for i in sorted(selected_indices, reverse=True):
         file_list.delete(i)
 
 def delete_all():
-    """删除所有文件"""
     if file_list.size() == 0:
         messagebox.showinfo("提示", "列表中没有文件可删除")
         return
@@ -101,32 +101,18 @@ def update_images():
     
     messagebox.showinfo("处理结果", result_msg)
 
-def test_drag_and_drop():
-    """测试拖拽功能是否真正可用"""
-    try:
-        # 尝试执行一个简单的拖拽相关操作来验证功能
-        root.call('::tkdnd::version')
-        return True
-    except:
-        return False
-
 # 初始化主窗口
 root = TkinterDnD.Tk()
 root.title("批量修改图片尺寸（统一96dpi）")
 root.geometry("700x450")
 
-# 优化tkdnd库初始化检测
+# 移除初始化时的严格检查，改为在实际拖拽失败时提示
 tkdnd_path = resource_path('tkdnd2.9.2')
 try:
-    # 尝试初始化tkdnd库
+    # 尝试初始化但不显示错误
     root.eval(f'::tkdnd::initialise "{tkdnd_path}" "tkdnd292.dll" "tkdnd"')
-    
-    # 实际测试拖拽功能是否可用
-    if not test_drag_and_drop():
-        raise Exception("拖拽功能测试失败")
 except:
-    # 只有在确实无法使用时才显示提示
-    messagebox.showwarning("提示", "拖拽功能可能无法使用，建议使用浏览按钮选择文件")
+    pass  # 静默处理初始化错误
 
 # 宽度输入
 tk.Label(root, text="宽度:").grid(row=0, column=0, padx=10, pady=5, sticky="e")
